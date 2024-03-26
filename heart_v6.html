@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heart Rate Monitor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        .container > * {
+            margin-bottom: 20px;
+        }
+
+        #video-container {
+            width: 300px;
+            height: 300px;
+            margin: 0 auto;
+            border-radius: 50%;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+        }
+
+        #video-preview {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 18px;
+            border: none;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        button:active {
+            background-color: #3e8e41;
+        }
+
+        .title {
+            font-size: 36px;
+            color: #333;
+        }
+
+        .instructions {
+            font-size: 18px;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">Heart Rate Monitor</h1>
+        <div id="video-container">
+            <video id="video-preview" autoplay muted playsinline></video>
+        </div>
+        <p class="instructions">Place your finger on the camera to start measuring your heart rate.</p>
+        <button id="record-button">Start Recording</button>
+        <div id="result"></div>
+    </div>
+
+<script>
+    const videoPreview = document.getElementById('video-preview');
+    const recordButton = document.getElementById('record-button');
+    const resultDiv = document.getElementById('result');
+
+    let mediaRecorder;
+    let isRecording = false;
+
+    async function startRecording() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            videoPreview.srcObject = stream;
+            recordButton.textContent = 'Recording...';
+            recordButton.disabled = true;
+            resultDiv.textContent = ''; // Clear previous result
+            mediaRecorder = new MediaRecorder(stream);
+            const chunks = [];
+
+            mediaRecorder.ondataavailable = function(event) {
+                chunks.push(event.data);
+            };
+
+
+            mediaRecorder.onstop = async function() {
+                const blob = new Blob(chunks, { type: 'video/mp4' });
+
+                const url = URL.createObjectURL(blob);
+
+                // // Create download button
+                // const a = document.createElement('a');
+                // a.href = url;
+                // a.download = 'recorded_video.mp4';
+                // a.textContent = 'Download Video';
+
+                // // Append button to the document body
+                // document.body.appendChild(a);
+
+                const formData = new FormData();
+                formData.append('video', blob);
+
+
+                try {
+                    const response = await fetch('http://127.0.0.1:5000/upload-video', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (response.ok) {
+                        const result = await response.json();
+                        resultDiv.textContent = `Heart rate: ${result.bpm} BPM`;
+                    } else {
+                        console.error('Failed to upload video');
+                        resultDiv.textContent = `Failed to measure heart rate. Please try again.`;
+                    }
+                } catch (err) {
+                    console.error('Error uploading video: ', err);
+                    resultDiv.textContent = `Failed to measure heart rate. Please try again.`;
+                }
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            setTimeout(stopRecording, 10000); // Stop recording after 10 seconds
+        } catch (err) {
+            console.error('Error accessing media devices: ', err);
+        }
+    }
+
+    function stopRecording() {
+        if (isRecording) {
+            mediaRecorder.stop();
+            recordButton.textContent = 'Start Recording';
+            recordButton.disabled = false;
+            isRecording = false;
+        }
+    }
+
+    recordButton.addEventListener('click', startRecording);
+</script>
+
+
+</body>
+</html>
